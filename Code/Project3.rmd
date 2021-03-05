@@ -1,0 +1,419 @@
+---
+title: "Exploratory Analysis of Global COVID-19 Infection Rate Based on Developement status of Country"
+author: "Team6: Ying Ji, Ruolin Liao, Chen Le, Yunyi Ren"
+date: "3/4/2021"
+output: html_document
+---
+```{r include = FALSE,warning=FALSE,message=FALSE,error=FALSE}
+knitr::opts_chunk$set(echo=FALSE)
+```
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning=FALSE, message=FALSE)
+```
+
+```{r,message=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(scales)
+library(lubridate)
+library(ggplot2)
+library(knitr)
+library(kableExtra)
+library(gplots)
+library(MASS)
+```
+
+
+## Abstract
+
+This report simply summaries the COVID-19 cases and death verse time, region, and transmission by some plots, and analyzes the relationship between the number of COVID-19 confirmed cases and some variables such as some underlying disease that we are interested in. It also summarizes the results of statistical modeling and validated the model assumptions we made. We are trying to investigate the causal inference and association between the COVID-19 infection rate and other factors.
+
+
+## Introduction
+
+The coronavirus that is ravaging the world, it starts with a fever, fatigue and dry cough. The more severe cases involve trouble breathing after one week. Older people and those with underlying medical problems like chronic kidney disease,  tuberculosis, coronary heart disease are more likely to develop serious illness. The COVID-19 seems to select only a few infected people developing obvious symptoms and people who already have other disorders and chronic diseases are more likely to develop severe symptoms or even die after infection. Although the group with the most severe symptoms is usually the elderly or people with underlying diseases such as heart disease, some of those who die from COVID-19 have been healthy or even relatively young. 
+
+The impact of the outbreak on developed countries is enormous, we know that the outbreak of COVID-19 is concentrated in those economically developed countries and regions, compared with countries and regions with backwards economies, the outbreak is not very serious. This is actually reasonable because developed countries and regions tend to have particularly high degree of urbanization, which means higher population density.
+
+The above statements may vary from region to region, thus we want to study the differences in COVID-19 infection rate in both developed and developing countries and to explore the impact of five kinds of diseases that include chronic kidney disease, diabetes, tuberculosis, obesity rate, and smoke rate on COVID-19 infections. We conducted a series of analyses on this issue based on data obtained from the WHO.
+
+## Background
+
+The outbreak of Coronavirus Disease is at the end of 2019, and now the United States has the most number of confirmed cases。 Coronavirus Disease 2019 (COVID-19) is an infectious disease caused by a newly discovered coronavirus, SARS-CoV-2. The virus can cause mild to severe respiratory illness, and recover without requiring special treatment. Older people, and those with underlying medical problems like cardiovascular disease, diabetes, chronic respiratory disease, and cancer are more likely to develop serious illnesses. There are already many known studies about the COVID-19. The two data set used in our analysis, one is from the World Health Organization ("https://covid19.who.int/WHO-COVID-19-global-data.csv"), which contains the date, country, region, new cases, new deaths, cumulative cases, and cumulative death. The other one is data that collects and merges some data from WHO, Wikipedia, and some other data set. It contains the country, region, cumulative cases and death per 100000 people, and some global underlying disease rate such as TB, kidney disease, diabetes, also with the smoke rate and obesity rate.
+
+
+## Descriptive Analysis
+
+In this section, we do the summary statistics of two data sets. One is the data set from WHO, which shows the daily and cumulative COVID-19 cases and deaths with the date and countries. The other one is the data containing the COVID-19 cases and deaths, which also contains some other variables that we are interested in. 
+
+```{r,message=FALSE}
+#import WHO-covid-19data 
+data <-read_csv("https://covid19.who.int/WHO-COVID-19-global-data.csv")
+colnames(data) <- c('date','country_code','country','WHO_region','New_cases','Cumulative_cases','New_deaths','Cumulative_deaths')
+data$date<- as.Date(data$date,format="%m/%d/%Y")
+```
+
+```{r}
+#check missing value
+check <- sum(is.na(data))
+
+#process missing value
+data = na.omit(data)
+```
+
+
+```{r,message=FALSE}
+#world map
+library(maps)
+world <- map_data("world");
+worldplot <- ggplot() +
+  geom_polygon(data = world, aes(x=long, y = lat, group = group)) 
+
+```
+
+
+```{r}
+data.today<- data %>% 
+  filter(date == "2021-2-28") %>% 
+ mutate(region=country)
+world[world=="USA"]<-"United States of America"
+world[world=="Bolivia"]<-"Bolivia (Plurinational State of)"
+world[world=="Virgin Islands"]<-"British Virgin Islands"
+world[world=="Cape Verde"]<-"Cabo Verde" 
+world[world=="Republic of the Congo"]<-"Congo"     
+world[world=="Ivory Coast"]<-"Côte d’Ivoire"  
+world[world=="Curacao"]<-"Curaçao"       
+world[world=="Czech Republic"]<-"Czechia"
+world[world=="North Korea"]<-"Democratic People's Republic of Korea"
+world[world=="Swaziland"]<-"Eswatini"
+world[world=="Falkland Islands"]<-"Falkland Islands (Malvinas)"
+
+world[world=="Tobago"]<-"Trinidad and Tobago"
+world[world=="Tanzania"]<-"United Republic of Tanzania"
+world[world=="Venezuela"]<-"Venezuela (Bolivarian Republic of)"
+world[world=="Vietnam"]<-"Viet Nam"
+world[world=="Tobago"]<-"Trinidad and Tobago"
+world[world=="Tanzania"]<-"United Republic of Tanzania"
+world[world=="Venezuela"]<-"Venezuela (Bolivarian Republic of)"
+world[world=="Vietnam"]<-"Viet Nam"
+
+world[world=="Iran"]<-"Iran (Islamic Republic of)"
+world[world=="Kosovo"]<-"Kosovo[1]"
+world[world=="Laos"]<-"Lao People's Democratic Republic"
+world[world=="Micronesia"]<-"Micronesia (Federated States of)"
+world[world=="South Korea"]<-"Republic of Korea"
+world[world=="Moldova"]<-"Republic of Moldova"
+world[world=="Reunion"]<-"Réunion"
+world[world=="Saint Barthelemy"]<-"Saint Barthélemy"
+world[world=="UK"]<-"The United Kingdom"
+
+data.today.world<- inner_join(world, data.today, by = "region")
+
+# Map
+fig.map  <- ggplot() +
+  geom_polygon(data = data.today.world, aes(x=long, y = lat, group = group,fill=Cumulative_deaths)) + 
+  coord_fixed(1.3)
+fig.map
+```
+
+To get a good sense of how the different regions or countries can affect the infectious rate, we observe the map below, which plots each country in the global world with different shades of blue to signify the different populations of COVID-19 cases. As we can see, the United States of America (USA) has the largest number of COVID-19 cases, which is more than 20000000 cases. Also, Brazil, India, and some countries in Europe have a great number of COVID-19 cases. This map figure shows the cumulative number of cases in countries around the world, suggesting that there may be a relationship between different countries.
+
+Next, we want to find trends in the number of COVID-19 cases and deaths versus time series.
+
+```{r,message=FALSE}
+library(plotly)
+p<- data.frame(data$date, data$New_cases, data$New_deaths)
+fig <- plot_ly(p, x = ~data$date, y =data$New_deaths , type = 'bar', name = 'New deaths')
+fig <- fig %>% add_trace(y = ~data$New_cases, name = 'New Case')
+fig <- fig %>% layout(yaxis = list(title = 'Cases'), barmode = 'stack')
+fig
+```
+
+```{r,message=FALSE}
+library(plotly)
+p1<- data.frame(data$date, data$Cumulative_cases, data$Cumulative_deaths)
+fig1<- plot_ly(p1, x = ~data$date, y =data$Cumulative_deaths, type = 'bar', name = 'Cumulative deaths')
+fig1<- fig1 %>% add_trace(y = ~data$Cumulative_cases, name = 'Cumulative Case')
+fig1<- fig1%>% layout(yaxis = list(title = 'Cases'), barmode = 'stack')
+fig1
+```
+
+We plot two different figures to compare the cumulative situation and daily new report situation. As time goes by, it is obvious that the cumulative cases and cumulative deaths continue increasing without truing and vibration. While the daily new cases and new deaths started as an upward trend, then reached a peak near January 2021, and then began to decline. One interesting thing is that there was a sharp drop on December 27, 2020, of the COVID-19 new cases, but it only lasted two or three days. On December 30, the number increased sharply and returned to almost the same number as on December 26. In all, from October 2020 to January 2021, the number of new COVID-19 cases per day was six to seven times higher than in April-July 2020 and twice as high as in July to October 2020. 
+Then we also want to find out the trend of the mortality rate of the people who already have the COVID-19.
+
+```{r}
+data1=aggregate(data$New_cases, by=list(data$date),FUN=sum)
+data2=aggregate(data$New_deaths, by=list(data$date),FUN=sum)
+colnames(data1)=c("date","new cases")
+colnames(data2)=c("date","new death")
+data3=merge(data1,data2)
+data3=data3[(17:426),]
+data3$rate=data3$`new death`/data3$`new cases`
+
+data4=aggregate(data$Cumulative_cases, by=list(data$date),FUN=sum)
+data5=aggregate(data$Cumulative_deaths, by=list(data$date),FUN=sum)
+colnames(data4) <- c("date","cases")
+colnames(data5) <- c("date","deaths")
+data6=merge(data4,data5)
+data6=data6[(9:426),]
+data6$rate=data6$deaths/data6$cases
+
+colors <- c("Daily Mortality Rate" = "red", "Cumulative Mortality Rate" = "steelblue")
+ggplot()+
+  geom_line(data=data3,aes(x=date,y=rate,col="Daily Mortality Rate"))+
+geom_line(data=data6,aes(date, y=rate,col="Cumulative Mortality Rate"))+
+labs(x = "Date",y = "Mortality Rate",color = "Legend")+
+scale_color_manual(values = colors)+
+theme(legend.position=c(.86, .89))
+```
+
+Similarly, we compare the cumulative mortality rate and daily mortality rate. From the plot, we can see that the variation of daily mortality rate is larger than the variation of cumulative mortality rate, and they both have peaks. A global maximum daily mortality rate is from February to March 2020, and a local maximum during April to May 2020. The maximum cumulative mortality rate is also around April to May 2020. The mortality rate is low around July 2020 to January 2021, this might be because of the huge increase in the daily new cases but the relatively stable deaths.
+
+We have analyzed the number of new and cumulative deaths and cases from the WHO dataset. We are interested in the impact of the coronavirus in both developed and developing countries and we want to look at the impact of five kinds of diseases on infection rates of COVID-19.
+
+We set a new dataset from the WHO website, after cleaning data, we contain 109 countries, regions, cumulative cases per 100000 population, transmission. Also, chronic kidney disease, smoke rate, diabetes rate, tuberculosis rate, obesity rate, developed countries are added which are obtained from WHO or Wikipedia.
+
+```{r}
+mydata=read.csv("C:/Users/LRL/Desktop/STA 207/project3/covid.csv")
+#process missing value
+mydata = na.omit(mydata)
+#data reduction
+mydata=mydata[,-c(5,6,7,10,11,12)]
+```
+
+```{r}
+#rename
+colnames(mydata)=c("contry","region",'cm_cases','cm_cases_p','cm_deaths','cm_death_p', 'transmission','kidneys','smoke','diabetes','TB','Obesity','DevelopedCT')
+
+mydata=subset(mydata,mydata$cm_death_p!=0)
+mydata$kidneys=as.numeric(mydata$kidneys)/1000
+mydata$TB=mydata$TB/1000
+
+mydata$inferate=mydata$cm_cases_p/1000
+```
+
+```{r}
+#The relationship between region, transmission and cumulative cases per 100000
+ggplot(mydata,aes(x=region,y=cm_cases_p))+
+  geom_bar(aes(fill=transmission),stat="identity",position="dodge")+labs(x="Region",y="Cumulative Cases per 100000")+
+  theme(legend.position=c(.86, .83))
+```
+
+The plot above analyzes the cumulative cases per 100000 in six regions due to different modes of transmission. Clusters and community accounted for most of the cases of transmission. The virus is more spread through community transmission, especially in Africa, America, and Europe. Clusters of cases dominate in Eastern Mediterranean, and south-East Asia.
+
+To analyze our data more accurately, We divided the five diseases into four levels based on the incidence of disease in order from small to large.
+
+```{r}
+mydata$kidneys1[mydata$kidneys >= 5.034   & mydata$kidneys < 7.292 ] = "1st"
+mydata$kidneys1[mydata$kidneys >=7.292    & mydata$kidneys < 9.775   ] = "2nd"
+mydata$kidneys1[mydata$kidneys >=9.775    & mydata$kidneys < 10.924] = "3rd"
+mydata$kidneys1[mydata$kidneys >=10.924   & mydata$kidneys <= 13.768 ] = "4th"
+
+#group smoke based on quantile
+mydata$smoke1[mydata$smoke >= 4.70 & mydata$smoke < 15.55 ] = "1st"
+mydata$smoke1[mydata$smoke >=15.55 & mydata$smoke < 22.35] = "2nd"
+mydata$smoke1[mydata$smoke >=22.35 & mydata$smoke < 28.05 ] = "3rd"
+mydata$smoke1[mydata$smoke >=28.05 & mydata$smoke <= 42.65 ] = "4th"
+
+#group diabetes based on quantile
+mydata$diabetes1[mydata$diabetes >= 1.000  & mydata$diabetes < 5.000     ] = "1st"
+mydata$diabetes1[mydata$diabetes >=5.000   & mydata$diabetes < 6.300     ] = "2nd"
+mydata$diabetes1[mydata$diabetes >=6.300   & mydata$diabetes < 9.200    ] = "3rd"
+mydata$diabetes1[mydata$diabetes >=9.200  & mydata$diabetes <= 22.000   ] = "4th"
+
+#group TB based on quantile
+mydata$TB1[mydata$TB >= 0.00    & mydata$TB < 0.00870     ] = "1st"
+mydata$TB1[mydata$TB >=0.00870  & mydata$TB < 0.03500    ] = "2nd"
+mydata$TB1[mydata$TB >=0.03500  & mydata$TB < 0.11700    ] = "3rd"
+mydata$TB1[mydata$TB >=0.11700  & mydata$TB <= 0.65400    ] = "4th"
+
+#group obesity based on quantile
+mydata$Obesity1[mydata$Obesity >= 2.1    & mydata$Obesity < 8.6      ] = "1st"
+mydata$Obesity1[mydata$Obesity >=8.6     & mydata$Obesity < 22.3   ] = "2nd"
+mydata$Obesity1[mydata$Obesity >=22.3    & mydata$Obesity < 26.6    ] = "3rd"
+mydata$Obesity1[mydata$Obesity >=26.6    & mydata$Obesity <= 37.3    ] = "4th"
+```
+
+```{r fig2, fig.height = 8, fig.width = 8, fig.align = "center"}
+options(knitr.duplicate.label = "allow")
+# Box plot
+g1 <- ggplot(mydata, aes(kidneys1,cm_cases_p,fill=kidneys1))+
+geom_boxplot()+
+  labs(x = "Quantile of chronic kidney disease",y = "Cumulative cases per 10000")+
+  theme(legend.position="none")
+
+#boxplot for smoke
+g2 <- ggplot(mydata, aes(smoke1,cm_cases_p,fill=smoke1))+
+geom_boxplot()+
+  labs(x = "Quantile of smoke",y = "Cumulative cases per 10000")+
+    theme(legend.position="none")
+
+#boxplot for diabetes
+g3 <- ggplot(mydata, aes(diabetes1,cm_cases_p,fill=diabetes1))+
+geom_boxplot()+
+  labs(x = "Quantile of diabetes",y = "Cumulative cases per 10000")+
+theme(legend.position="none")
+
+#boxplot for TB
+g4 <- ggplot(mydata, aes(TB1,cm_cases_p,fill=TB1))+
+geom_boxplot()+
+  labs(x = "Quantile of tuberculosis",y = "Cumulative cases per 10000")+
+theme(legend.position="none")
+
+#boxplot for obesity
+g5 <- ggplot(mydata, aes(Obesity1,cm_cases_p,fill=Obesity1))+
+geom_boxplot()+
+  labs(x = "Quantile of obesity",y = "Cumulative cases per 10000")+
+theme(legend.position="none")
+
+gridExtra::grid.arrange(g1,g2,g3,g4,g5, nrow=3, ncol=2)
+```
+
+The five box charts above show the relationship between the rate of different diseases and the rate of new crown infection. The median thickness for every group seems to be different. The cumulative cases per 100000 decrease with the increase of incidence of chronic kidney and tuberculosis, increasing with the increase of smoke rate and obesity rate. As the prevalence of diabetes rate increases, cumulative cases per 100000 increase and then decreases.
+
+```{r, fig.height = 6, fig.width = 8, fig.align = "center"}
+ ggplot(data=mydata,aes(x=cm_cases_p,fill=DevelopedCT))+
+    geom_density(alpha=0.3)+
+    labs(x = "cumulative cases per 100000",y = "density")+
+  theme(legend.position=c(.86, .89))+
+ scale_fill_discrete(name="Developed country")
+
+```
+
+This plot shows the distribution of new coronavirus cumulative cases per 10000 in both developed and developing countries. COVID-19 spreads more in developing countries when the infection rate is less than 25,00 per 100000. The COVID-19 is more severe in developed countries than in developing countries once the infection rate reaches 25,000.
+
+## Inferential Analysis
+
+$Y^{\frac{1}{4}}=\beta_0+\beta_1X_1+\beta_2X_2+\beta_3X_3+\beta_4X_4+\beta_5X_5+\beta_6X_6+\beta_7{X_3}^2+\beta_8{X_5}^2+\epsilon$, where the $\epsilon$ is the error term follows normal distribution.
+
+Y: numeric. The total diagnostic rate of COVID-19 in each country at 02/28/2021[1].
+
+X1 numeric. The incidence of Chronic kidney disease (CDK) [2]
+
+X2 numeric. The proportion of the population who smoke in 2019 [3]. 
+
+X3 numeric. The incidence of diabetes in 2019 [4].
+
+X4 numeric. The incidence of tuberculosis in 2019 [5].
+
+X5 numeric. The proportion of the population that is obese in 2016 (Derived from The World Factbook authored by the Central Intelligence Agency [6]).
+
+X6 binary. Indicator of the country is developed or developing in 2021 (Human Development Index is greater than 80) [5]. 
+
+The model requires the four assumptions: 1. Linearity: There must be a linear relationship between the response variable and the independent variables. 2. Multivariate normality: the residuals are normally distributed. 3. No or little multicollinearity:  the independent variables are not highly correlated with each other. 4. Homoscedasticity: the variance of error terms are similar across the values of the independent variables.
+
+We included five covariates representing the proportion or incidence of population health conditions, and we think the higher or lower of these types of factors may be related to how the COVID-19 virus spread in the country. For example, tuberculosis is an infectious bacterial disease which is similar as COVID-19, and we expect they have positive correlation. The two second degrees of polynomial terms are included in the model because there is a non-linear relationship in the residual plot if no polynomial terms are included.
+
+Moreover, to analyze the causal inference between the total infection rate of COVID-19 and the indicator of whether a country is developed, we use the propensity score to reduce the selection bias in some degrees from our binary treatment (X6), and fit the new data into the model again. The relationship between the treatment and covariates are explored by simple linear regression.
+
+## Results and Sensitivity Analysis
+
+First, we create a multi-linear model to investigate the relationship between COVID-19 diagnostic rate, developedCT and other disease incidence variables. However, from the residual vs fitted plot, we can see that there is a non-linear relationship between the response variable diagnostic rate and the other explanatory variables. Therefore, we consider using a polynomial model. In addition, the points in this plot are not equally distributed around the line, so we transform our response variable to the 4th square root in order to satisfy the homoscedasticity assumption. 
+
+The summary output of our model lm1 is shown as follows. From the output, we can see that diabetes,Obesity and DevelopedCTYES are significant at level 0.01, which means that there are association between our response variable COVID-19 diagnostics rate and these significant variables. Then we make diagnostic plots of this lm1 model.From the "Residual vs Fitted" plot, there is no obvious relationships between residuals and fitted values, which is good. Also, the spread of the points are approximately equal around the horizontal line, thus we can assume the homogeneity of variances here. Since most of points fall on the Normal Q-Q line, thus we can assume normality here.
+
+```{r}
+mydata$DevelopedCT = as.factor(mydata$DevelopedCT)
+lm1 = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2),data=mydata)
+summary(lm1)
+par(mfrow=c(2,2))
+plot(lm1)
+```
+
+To detect the causal inference of our treatment variable, we need to remove the selection bias of our model by using propensity scores. After we get our new model. From the output, the treatment group DevelopedCTYES is significant under level 0.001, thus we conclude that there may exist an causality between Covid-19 diagnostic rate and the developing status of the country. We also make model diagnostics, where normal-QQ plot becomes better and residual vs. fitted plot is roughly good. Therefore this new model nearly satisfy the normality and equal variance assumption.
+
+```{r}
+### remove selection bias 
+options(digits=4)
+library(lmerTest)
+mydata$DevelopedCT = relevel(mydata$DevelopedCT,ref='NO')
+models = glm(DevelopedCT ~ kidneys+smoke+diabetes+TB+Obesity+I(diabetes^2)+I(Obesity^2),family = binomial,data = mydata)
+prob = models$fitted.values
+pscore = ifelse(mydata$DevelopedCT=='YES',prob,(1-prob))
+weight = 1/pscore
+```
+
+```{r}
+model_new = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2),data=mydata,weights = weight)
+summary(model_new)
+par(mfrow=c(2,2))
+plot(model_new)
+```
+
+Moreover, we think that diabetes and obesity may have an influence on the control (DevelopedCT = no) and the treatment (DevelopedCT = yes) group, so we performed a balance analysis to assess the degree of bias to treatment and control groups before and after the use of propensity scores, respectively.You can see the comparison table as follows. From the table, it seems that the selection biases by kidneys, smoke, TB and obesity are effectively removed after propensity score weighting.
+
+```{r,results='hide'} 
+options(digits=4)
+### Balance Analysis before estimating propensity scores
+
+cat("kidneys ")
+summary(lm(kidneys~DevelopedCT,data=mydata))$coef[[2,4]]
+cat("smoke ")
+summary(lm(smoke~DevelopedCT,data=mydata))$coef[[2,4]]
+cat("diabetes ")
+summary(lm(diabetes~DevelopedCT,data=mydata))$coef[[2,4]]
+cat("TB ")
+summary(lm(TB~DevelopedCT,data=mydata))$coef[[2,4]]
+cat("Obesity ")
+summary(lm(Obesity~DevelopedCT,data=mydata))$coef[[2,4]]
+```
+
+```{r,results='hide'}
+## Balance Analysis after estimating propensity scores
+cat("kidneys ")
+summary(lm(kidneys~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("smoke ")
+summary(lm(smoke~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("diabetes ")
+summary(lm(diabetes~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("TB ")
+summary(lm(TB~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("Obesity ")
+summary(lm(Obesity~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+```
+
+```{r}
+table <- data.frame ( Variable = c("kidneys","smoke","diabetes","TB","Obesity"),
+                     
+                      p_value = c( "5.468263e-12", "0.001443113","0.645696 ","5.823153e-08   ","4.846996e-10"),
+                      p_value_weight = c( "0.9749", "0.38693","1.910052e-06 ","0.002348  ","0.1996")
+                  )
+kable(table,align="c",caption = "**Balance analysis**") %>%
+kable_styling(bootstrap_options = "striped", full_width = F)
+```
+
+## Association and Causal inference
+
+By applying into our model, the data suggest the total diagnostic rate of Covid-19 in each country is significantly associated with the proportion of obesity (p=0.00005) and the proportion of diabetes (p = 0.00798). The coefficient of obesity and diabetes are both positive, meaning they are positively correlated to the Covid-19 diagnostic rate. 
+
+In our balance analysis, the country type is significantly related to CDK, TB, and Obesity. Based on our fitted model, to be able to appropriately discuss the causal inference, we need to reduce the selection bias which may be caused by the obesity factor, so we use this calculated propensity score. This is because the country type may be the confounder to the covid diagnostic rate, and both higher covid diagnostic rate and different type of country may be caused by the obesity rate.
+	
+After using the propensity score to weight the data, we find whether a country is developed is significantly related to the Covid-19 diagnostic rate with p-value 0.0004 and coefficient 0.1844. Therefore, we conclude that there is a causal relationship between the two variables, and we are expecting a higher average of diagnostic rate of Covid-19 in the developed countries than the developing countries. 
+
+## Conclusion
+
+We think there are many reasons that could lead to the causality between whether a country is developed or not and Covid-19 diagnostic rate. For example, the developed countries are likely to have a higher population mobility, or the people in the developed countries are more likely to pursue liberty so that they are not willing to wear a mask. 
+
+One downside of our approach is that after applying the propensity score, the p-value of the regression coefficient between country type and diabetes becomes $1.91*e^{-06}$ from 0.64. Even though the p-value is not significant enough based on 0.05 level, the covariate Diabetes can increase the selection bias when we do the causal analysis. Therefore, other methods may be suggested in the data.
+
+Tracing how virus spread is the core topic of epidemiology, and here, we conclude the diagnostic rate of Covid-19 is influenced by the developing status of the country. For further study, exploring and verifying how the relationship happens is a good direction to investigate.
+
+## Reference
+
+[1] WHO Coronavirus (COVID-19) Dashboard. (2021). WHO Coronavirus Disease (COVID-19) Dashboard. https://covid19.who.int/
+
+[2] Lancet. Global, regional, and national burden of chronic kidney disease, 1990–2017: a systematic analysis for the Global Burden of Disease Study 2017.
+https://www.thelancet.com/journals/lancet/article/PIIS0140-6736(20)30045-3/fulltext
+
+[3]Estimate of current tobacco use precalence(%). (2020). WHO. https://www.who.int/data/gho/data/indicators/indicator-details/GHO/gho-tobacco-control-monitor-current-tobaccouse-tobaccosmoking-cigarrettesmoking-agestd-tobagestdcurr
+
+[4]Countries ranked by Diabetes prevalence (% of population ages 20 to 79). (2019). Indexmundi. https://www.indexmundi.com/facts/indicators/SH.STA.DIAB.ZS/rankings
+
+[5] Prevalence of obesity among ADULTS, Bmi = 30 (CRUDE estimate) (%).. Retrieved March 05, 2021, from https://www.who.int/data/gho/data/indicators/indicator-details/GHO/prevalence-of-obesity-among-adults-bmi-=-30-(crude-estimate)-(-)
+
+[6] Human development reports. (n.d.). Retrieved March 05, 2021, from http://hdr.undp.org/en/indicators/137506
+
+
+
+

@@ -2,7 +2,9 @@
 title: "Exploratory Analysis of Global COVID-19 Infection Rate Based on Developement status of Country"
 author: "Team6: Ying Ji, Ruolin Liao, Chen Le, Yunyi Ren"
 date: "3/4/2021"
-output: html_document
+output:
+  github_document:
+    pandoc_args: --webtex
 ---
 ```{r include = FALSE,warning=FALSE,message=FALSE,error=FALSE}
 knitr::opts_chunk$set(echo=FALSE)

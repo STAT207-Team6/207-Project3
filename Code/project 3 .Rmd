@@ -321,40 +321,43 @@ par(mfrow=c(2,2))
 plot(lm)
 ```
 
-So, we transform our response variable to 1/4 order.
+So, we transform our response variable to the 1/4 order. The residual plot shows a little quadratic trend , thus we add the polynomial terms to our model.
  
 ```{r}
 lm1=  lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT,data=mydata)
-par(mfrow=c(2,2))
-plot(lm1)
+#par(mfrow=c(2,2))
+#plot(lm1)
 ```
-
-You can see a little quadratic trend in this residual plot, thus we add the polynomial terms. 
 
 ```{r}
 lm2 = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2)+I(smoke^2)+I(kidneys^2)+I(TB^2),data=mydata)
-summary(lm2)
+#summary(lm2)
 #MASS::boxcox(lm2)
 #par(mfrow=c(2,2))
 #plot(lm2)
 ```
 
-After selecting the significant 2-nd order terms I(diabetes^2) and I(Obesity^2), we get our final model. From the diagnostic plots, you can see the residual line becomes more horizontal, which is quite good. We will use this model to get association between our variables. 
-
-The summary output of our final model is shown as follows. From the output, we can see that diabetes,Obesity and DevelopedCTYES are significant at level 0.01, which means that there are association between our response variable COVID-19 diagnostics rate and these significant variables. Then we make diagnostic plots of this model. From the "Residual vs Fitted" plot, there is no obvious relationships between residuals and fitted values, which is good. Also, the spread of the points are approximately equal around the horizontal line, thus we can assume the homogeneity of variances here. Since most of points fall on the Normal Q-Q line, thus we can assume normality here. Furthermore, we make two plots to show the relationship  of” y  vs obesity “ and “y vs diabetes”, note that we has already include their second-order term, however, they still show a linear trend because the coefficient of 2nd order term is very small. So we conclude that they are both linearly positively related with infection rate. 
+After selecting the significant 2-nd order terms I(diabetes^2) and I(Obesity^2), we get our final model. From the diagnostic plots, you can see the residual line becomes more horizontal, which is quite good. We will use this model to get association between our variables.
 
 ```{r}
 lm3 = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2),data=mydata)
-summary(lm3)
 #MASS::boxcox(lm2)
 par(mfrow=c(2,2))
 plot(lm3)
-curve(-0.0008944*x^2+0.0526435*x,xlab = "obesity", ylab = "inferate")
-curve( -0.0034009*x^2+0.0679543*x,xlab = "diabetes", ylab = "inferate")
-#pairs(~ inferate + kidneys + smoke+TB+DevelopedCT, data = mydata)
 ```
 
-To detect the causal inference of our treatment variable, we need to remove the selection bias of our model by using propensity scores. After we get our new model. From the output, the treatment group DevelopedCTYES is significant under level 0.001, thus we conclude that there may exist an causality between Covid-19 diagnostic rate and the developing status of the country. We also make model diagnostics, which is similar as before.
+The summary output of our final model is shown as follows. From the output, we can see that diabetes,Obesity and DevelopedCTYES are significant at level 0.01, which means that there are association between our response variable COVID-19 diagnostics rate and these significant variables. 
+Furthermore, we make two plots to show the relationship  of” y  vs obesity “ and “y vs diabetes”, note that we has already include their second-order term, however, they still show a linear trend because the coefficient of 2nd order term is very small. So we conclude that they are both linearly positively related with infection rate. 
+
+```{r}
+summary(lm3)
+par(mfrow=c(1,2))
+curve(-0.0008944*x^2+0.0526435*x,xlab = "obesity", ylab = "inferate")
+curve( -0.0034009*x^2+0.0679543*x,xlab = "diabetes", ylab = "inferate")
+```
+
+To detect the causal inference of our treatment variable, we need to remove the selection bias of our model by using propensity scores. Then we get our new model. 
+From the output, the treatment group DevelopedCTYES is significant under level 0.001, thus we conclude that there may exist an causality between Covid-19 diagnostic rate and the developing status of the country. We also make model diagnostics, which is similar as before.
 
 ```{r}
 ### remove selection bias 
@@ -375,7 +378,6 @@ plot(model_new)
 ```
 
 Moreover, we think that diabetes and obesity may have an influence on the control (DevelopedCT = no) and the treatment (DevelopedCT = yes) group, so we performed a balance analysis to assess the degree of bias to treatment and control groups before and after the use of propensity scores, respectively.You can see the comparison table as follows. From the table, it seems that the selection biases by kidneys, smoke, TB and obesity are effectively removed after propensity score weighting.
-
 ```{r,results='hide'} 
 options(digits=4)
 ### Balance Analysis before estimating propensity scores

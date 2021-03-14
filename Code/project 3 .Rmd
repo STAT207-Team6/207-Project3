@@ -312,7 +312,7 @@ Moreover, to analyze the causal inference between the total infection rate of CO
 
 ## Results and Sensitivity Analysis
 
-First, we create a multi-linear model to investigate the relationship between COVID-19 diagnostic rate, developedCT and other disease incidence variables. However, from the residual vs fitted plot, we can see that there is a non-linear relationship between the response variable diagnostic rate and the other explanatory variables. Therefore, we consider using a polynomial model. In addition, the points in this plot are not equally distributed around the line, so we transform our response variable to the 4th square root in order to satisfy the homoscedasticity assumption. 
+First, We choose the multi-variate linear model to fit our data. Our response variable is the total infection rate of covid-19 in each country and our model include five covariates representing the rate of five diseases. From the normal-qq plot, we can see that there is a departure from the qq line.
 
 ```{r}
 mydata$DevelopedCT = as.factor(mydata$DevelopedCT)
@@ -321,21 +321,27 @@ par(mfrow=c(2,2))
 plot(lm)
 ```
 
+So, we transform our response variable to 1/4 order.
+ 
 ```{r}
 lm1=  lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT,data=mydata)
 par(mfrow=c(2,2))
 plot(lm1)
 ```
 
+You can see a little quadratic trend in this residual plot, thus we add the polynomial terms. 
+
 ```{r}
 lm2 = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2)+I(smoke^2)+I(kidneys^2)+I(TB^2),data=mydata)
 summary(lm2)
 #MASS::boxcox(lm2)
-par(mfrow=c(2,2))
-plot(lm2)
+#par(mfrow=c(2,2))
+#plot(lm2)
 ```
 
-The summary output of our model lm3 is shown as follows. From the output, we can see that diabetes,Obesity and DevelopedCTYES are significant at level 0.01, which means that there are association between our response variable COVID-19 diagnostics rate and these significant variables. Then we make diagnostic plots of this lm3 model.From the "Residual vs Fitted" plot, there is no obvious relationships between residuals and fitted values, which is good. Also, the spread of the points are approximately equal around the horizontal line, thus we can assume the homogeneity of variances here. Since most of points fall on the Normal Q-Q line, thus we can assume normality here.
+After selecting the significant 2-nd order terms I(diabetes^2) and I(Obesity^2), we get our final model. From the diagnostic plots, you can see the residual line becomes more horizontal, which is quite good. We will use this model to get association between our variables. 
+
+The summary output of our final model is shown as follows. From the output, we can see that diabetes,Obesity and DevelopedCTYES are significant at level 0.01, which means that there are association between our response variable COVID-19 diagnostics rate and these significant variables. Then we make diagnostic plots of this model. From the "Residual vs Fitted" plot, there is no obvious relationships between residuals and fitted values, which is good. Also, the spread of the points are approximately equal around the horizontal line, thus we can assume the homogeneity of variances here. Since most of points fall on the Normal Q-Q line, thus we can assume normality here. Furthermore, we make two plots to show the relationship  of” y  vs obesity “ and “y vs diabetes”, note that we has already include their second-order term, however, they still show a linear trend because the coefficient of 2nd order term is very small. So we conclude that they are both linearly positively related with infection rate. 
 
 ```{r}
 lm3 = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2),data=mydata)
@@ -346,10 +352,9 @@ plot(lm3)
 curve(-0.0008944*x^2+0.0526435*x,xlab = "obesity", ylab = "inferate")
 curve( -0.0034009*x^2+0.0679543*x,xlab = "diabetes", ylab = "inferate")
 #pairs(~ inferate + kidneys + smoke+TB+DevelopedCT, data = mydata)
-
 ```
 
-To detect the causal inference of our treatment variable, we need to remove the selection bias of our model by using propensity scores. After we get our new model. From the output, the treatment group DevelopedCTYES is significant under level 0.001, thus we conclude that there may exist an causality between Covid-19 diagnostic rate and the developing status of the country. We also make model diagnostics, where normal-QQ plot becomes better and residual vs. fitted plot is roughly good. Therefore this new model nearly satisfy the normality and equal variance assumption.
+To detect the causal inference of our treatment variable, we need to remove the selection bias of our model by using propensity scores. After we get our new model. From the output, the treatment group DevelopedCTYES is significant under level 0.001, thus we conclude that there may exist an causality between Covid-19 diagnostic rate and the developing status of the country. We also make model diagnostics, which is similar as before.
 
 ```{r}
 ### remove selection bias 
@@ -401,11 +406,34 @@ cat("Obesity ")
 summary(lm(Obesity~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
 ```
 
+```{r,results='hide'}
+pscore[which(pscore>=0.98)] <- 0.98
+pscore[which(pscore<=0.02)] <- 0.02
+weight = 1/pscore
+model_newnew = lm(inferate^(1/4)~kidneys+smoke+diabetes+TB+Obesity+DevelopedCT+I(diabetes^2)+I(Obesity^2),data=mydata,weights = weight)
+#summary(model_newnew)
+#par(mfrow=c(2,2))
+#plot(model_newnew)
+
+cat("kidneys ")
+summary(lm(kidneys~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("smoke ")
+summary(lm(smoke~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("diabetes ")
+summary(lm(diabetes~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("TB ")
+summary(lm(TB~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+cat("Obesity ")
+summary(lm(Obesity~DevelopedCT,data=mydata,,weights = weight))$coef[[2,4]]
+```
+
+
 ```{r}
 table <- data.frame ( Variable = c("kidneys","smoke","diabetes","TB","Obesity"),
                      
-                      p_value = c( "5.468263e-12", "0.001443113","0.645696 ","5.823153e-08   ","4.846996e-10"),
-                      p_value_weight = c( "0.9749", "0.38693","1.910052e-06 ","0.002348  ","0.1996")
+                      p_value = c( "<0.0001", "0.0014","0.6457 ","<0.0001  ","<0.0001"),
+                      p_value_weight = c( "0.9749", "0.3869","<0.0001 ","0.0023  ","0.1996"),
+                      p_value_after_trimming = c( "0.2303", "0.297","0.0004 ","0.0004  ","0.0328")
                   )
 kable(table,align="c",caption = "**Balance analysis**") %>%
 kable_styling(bootstrap_options = "striped", full_width = F)
@@ -415,9 +443,11 @@ kable_styling(bootstrap_options = "striped", full_width = F)
 
 By applying into our model, the data suggest the total diagnostic rate of Covid-19 in each country is significantly associated with the proportion of obesity (p=0.00005) and the proportion of diabetes (p = 0.00798). The coefficient of obesity and diabetes are both positive, meaning they are positively correlated to the Covid-19 diagnostic rate. 
 
-In our balance analysis, the country type is significantly related to CDK, TB, and Obesity. Based on our fitted model, to be able to appropriately discuss the causal inference, we need to reduce the selection bias which may be caused by the obesity factor, so we use this calculated propensity score. This is because the country type may be the confounder to the covid diagnostic rate, and both higher covid diagnostic rate and different type of country may be caused by the obesity rate.
-	
-After using the propensity score to weight the data, we find whether a country is developed is significantly related to the Covid-19 diagnostic rate with p-value 0.0004 and coefficient 0.1844. Therefore, we conclude that there is a causal relationship between the two variables, and we are expecting a higher average of diagnostic rate of Covid-19 in the developed countries than the developing countries. 
+In our balance analysis, the country type is significantly related to CDK, TB, and Obesity. Based on our fitted model, to be able to appropriately discuss the causal inference, we need to reduce the selection bias which may be caused by the obesity factor, so we use this calculated propensity score. This is because the country type may be the confounder to the covid diagnostic rate, and both higher covid diagnostic rate and different type of country may be caused by the obesity rate. 
+ 
+After using the propensity score to weight the data, some results in the second column is better, but the diabetes from insignificant become significant. To solve the issue, we guess this may caused by the extreme value on the propensity score, so we use the trimming method to adjust the extreme value. Nevertheless, we can see the result doesn't change much, and this maybe a limitation when we applied the propensity score on our data.
+
+However, we find whether a country is developed is significantly related to the Covid-19 diagnostic rate with p-value 0.0004 and coefficient 0.1844 in the weighted data, and with p-value 0.0070 in the unlighted data. So, We think the above problem will not change our conclusion, due to all the model shows significant result. Therefore, we conclude that there is a causal relationship between the two variables, and we are expecting a higher average of diagnostic rate of Covid-19 in the developed countries than the developing countries. 
 
 ## Conclusion
 
